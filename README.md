@@ -1,86 +1,74 @@
-# comparethemarket data engineering exercise
+**Project have the following structure**
+- App: backbone of the project, where all the dataframe transformation are being made
+- SparkResources: contains all the basic configuration for Spark session and some methods related to DF processing, also contains some unused method (due to lack of time and environment limitation) that can calculate dynamically the spark resources needed. 
+- HDFSServices: contains a small method in case it's required to get the properties from HDFS
 
-Please allocate 2-4 hours for this task and treat the exercise as writing a production application.
-We'd like you to do this in Scala. 
+**ETL Steps**:
+- First all the source files are read
+- Then we get the top 20 movies with a minimum of 50 votes with the ranking determined by:
+`        (numVotes/averageNumberOfVotes) * averageRating   ` 
+- After that we perform a series of joiner, aggregation other transformation to the data in order to get the list the persons who are most often credited and list the different titles of the 20 movies.
 
-## General instructions
+**Resources**:
 
-We'd like you to write an application which will read events (representing a customer interaction with comparethemarket) 
-from a Kafka topic, flatten the data to extract some meaningful information and write the result in the local filesystem. 
-Assume the volume of events being written to the topic is extremely large and the topic has a short retention policy.
+The file contains a project.properties file in the resources folder, which contains the path to all the needed sources, so it is not need to be hardcoded.
 
-Please make sure all the dependencies are accessible through publicly available repositories.
+In case that the source files path change more dynamically, the path can be placed outside the project, so there is no need to package and re-deploy the software.
 
-A docker-compose for kafka is provided to quick-start your testing.
+The file also can be configured to be taken from HDFS, to avoid path problems when running in yarn cluster mode.
 
-Once done, please provide the solution in a zip file.
 
-### Part 1
-Your app should read the events from a Kafka topic. The events are in json format and not all fields are necessarily 
-mandatory.
+**Running the project**:
+- Please first git clone the project and wait for the Maven dependencies to be indexed and downloaded. All dependencies are public.
+- After this, please package the jar file using Maven.
+- Ir order to run the jar file:
+    - Local mode:
+    
+    `spark-submit --master local[*] --deploy-mode client --class com.bgc.scala.App C:\Users\aleja\Downloads\bgcExample\target\bgcExample-1.0-SNAPSHOT.jar `
+    - Cluster mode (Spark standalone mode):
+    
+    `spark-submit --master spark://IP:PORT --num-executors=2 --class com.bgc.scala.App C:\Users\aleja\Downloads\bgcExample\target\bgcExample-1.0-SNAPSHOT.jar `
 
-### Part 2
-We would like you to extract a list of companies per user from the input data.
+**Testing**:
+Two tested were performed, local mode and cluster mode. For the second test, a standalone local cluster was created with one master and 3 executors, both test were successful and provided the following result:
 
-#### Example
-Input: 
-```
-{
-  "event_type": "click_summary",
-  "occurred_at": "2019-01-01T16:23:38.4707723+00:00",
-  "user": "hodor",
-  "clicks": [
-    {
-      "target": "linkId1",
-      "company": "Compare the Market",
-      "url": "http://www.comparethemarket.com/"
-    },
-    {
-      "target": "linkId2",
-      "company": "Example",
-      "url": "http://www.example.com/"
-    }
-  ]
-}
-```
+|   tconst|        primaryNames|          titleslist|
+--- | --- | ---
+|tt0111161|[Stephen King, Bo...|[The Shawshank Re...|
+|tt0468569|[Lorne Orleans, M...|[The Dark Knight,...|
+|tt1375666|[Hans Zimmer, Chr...|[Inception, Incep...|
+|tt0137523|[Ross Grayson Bel...|[Fight Club, Figh...|
+|tt0110912|[Bruce Willis, La...|[Pulp Fiction, Pu...|
+|tt0109830|[Gary Sinise, Rob...|[Forrest Gump, Fo...|
+|tt0944947|[Kit Harington, E...|[Game of Thrones,...|
+|tt0133093|[Carrie-Anne Moss...|[The Matrix, The ...|
+|tt0120737|[J.R.R. Tolkien, ...|[The Lord of the ...|
+|tt0167260|[Fran Walsh, Pete...|[The Lord of the ...|
+|tt0068646|[Mario Puzo, Fran...|[The Godfather, T...|
+|tt1345836|[Gary Oldman, Ann...|[The Dark Knight ...|
+|tt0167261|[J.R.R. Tolkien, ...|[The Lord of the ...|
+|tt0816692|[Emma Thomas, Jes...|[Interstellar, In...|
+|tt0114369|[Richard Francis-...|      [Se7en, Se7en]|
+|tt0903747|[Steven Michael Q...|[Breaking Bad, Br...|
+|tt1853728|[Kerry Washington...|[Django Unchained...|
+|tt0172495|[Russell Crowe, R...|[Gladiator, Gladi...|
+|tt0372784|[Christopher Nola...|[Batman Begins, B...|
+|tt0848228|[Robert Downey Jr...|[The Avengers, Th...|
 
-Output:
-```
-{
-  "user": "hodor",
-  "companies": [
-    "Compare the Market",
-    "Example"
-  ]
-}
-``` 
+Please find the following screenshots with the test performed in Cluster mode.
+https://drive.google.com/open?id=1BuAYaw98siOXGY59rOqJn80JThaAUBrK
 
-### Part 3
-The end result should be written as json files in the local filesystem. There should be one file per user (for 
-simplicity you can assume you will always only get one event for a user), e.g. `output/clicks_{username}.json`
+**Final notes**:
+- jdk1.8.0_191 used
+- Although in my daily work I always focus in the details and try to be strict as possible in good practices, due to the lack of time it was unfeasible to perform unit and integration test were possible and some inconsistencies could result in naming conventions, etc. All the effort were focused on producing the expected results.
+- No `spark.sql(...)` statements were used as required.
+- All the DataFrames were filtered before join or aggregation steps to improve performance and reduce shuffle.
+- The result of the process is a standard output as no output were specified, such as HDFS csv file, a Hive or a NOSQL table.
 
-## Candidate's corner
-Please use this section to explain your choices of libraries, your selection of a specific technology/framework 
-and why you feel it is justified for this particular task, any assumptions you've made, 
-any improvements you might make given more time and anything else you'd like us to know.
-
-IMPORTANT NOTE:
-Please run the following commands on the kafka docker container:
-mkdir -p /output/error
-chmod 666 /output
-chmod 666 /output/error
+  
  
-Libraries:
-- For the JSON parser the chosen library is lift-json, as it's fast and reliable, have a lot of documentation and testing.
-- For Kafka, the version chosen was 2.2.0, which have a nice balance between new improvements and stability (as the latest version was just released some months ago).
-  
-The process was created assuming that each message is singular event type.
+   
 
-Given more time, some of the tunes that can be applied are:
-- Get the file path and file names from an external config file, so there is no need to deploy in case of changes in the gateway.
-- Improve the error handling, adding more exceptions (e.g. if there is any problem adding the file, if any of the folders does not exists)
-- Error logging can be improved 
-- Maybe some tweaks to tune the consumer performance (i.e. consumer buffers), but for this is necessary to test the performance with real data.
-  
- To run the jar:
- java -cp ctm-data-eng-exercise-assembly-0.1.jar com.Consumer [Topic-name]  [group-name] localhost:9092  
+
+
+
